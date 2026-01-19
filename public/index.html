@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elezioni Studentesche - Portale Ufficiale</title>
+    <style>
+        :root {
+            --primary-color: #0056b3;
+            --secondary-color: #f8f9fa;
+            --text-color: #333;
+            --accent-color: #28a745;
+            --danger-color: #dc3545;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #e9ecef;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: var(--text-color);
+        }
+
+        .container {
+            background: white;
+            width: 90%;
+            max-width: 600px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary-color), #004494);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 { margin: 0; font-size: 1.8rem; }
+        .header p { margin: 10px 0 0; opacity: 0.9; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
+
+        .content { padding: 30px; }
+
+        .form-group { margin-bottom: 20px; }
+        
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            box-sizing: border-box; 
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-vote { background-color: var(--primary-color); color: white; margin-bottom: 15px; }
+        .btn-vote:hover { background-color: #004494; }
+
+        .btn-refresh { background-color: var(--secondary-color); color: var(--text-color); border: 1px solid #ddd; }
+        .btn-refresh:hover { background-color: #e2e6ea; }
+
+        /* Stile Tabella Risultati */
+        .results-area { margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #f8f9fa; color: #666; font-size: 0.85rem; text-transform: uppercase; }
+        td:last-child { font-weight: bold; text-align: right; }
+        
+        .status-msg { margin-top: 15px; padding: 10px; border-radius: 6px; font-size: 0.9rem; display: none; text-align: center;}
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        
+        .footer {
+            text-align: center;
+            padding: 15px;
+            background: #f1f1f1;
+            font-size: 0.8rem;
+            color: #888;
+        }
+    </style>
+    <script>
+       
+        function showMessage(msg, type) {
+            const el = document.getElementById('status');
+            el.textContent = msg;
+            el.className = 'status-msg ' + type;
+            el.style.display = 'block';
+            setTimeout(() => { el.style.display = 'none'; }, 3000);
+        }
+
+      async function inviaVoto() {
+        // Raccogliamo i dati dai nuovi ID
+        const nome = document.getElementById('nome').value;
+        const cognome = document.getElementById('cognome').value;
+        const classe = document.getElementById('classe').value;
+        const candidato = document.getElementById('candidato').value;
+        
+        // Validazione base
+        if(!nome || !cognome || !classe || !candidato) {
+            showMessage("Tutti i campi sono obbligatori!", "error");
+            return;
+        }
+
+        try {
+            const res = await fetch('/vota', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nome, cognome, classe, candidato })
+            });
+            const data = await res.json();
+            
+            if(res.ok) {
+                showMessage("Voto registrato con successo!", "success");
+                // Puliamo i campi dopo il voto
+                document.getElementById('nome').value = '';
+                document.getElementById('cognome').value = '';
+                document.getElementById('candidato').value = '';
+                vediRisultati(); 
+            } else {
+                showMessage("Errore: " + data.error, "error");
+            }
+        } catch (e) {
+            showMessage("Errore di connessione al server", "error");
+        }
+    }
+
+        async function vediRisultati() {
+            try {
+                const res = await fetch('/risultati');
+                const data = await res.json();
+                const tbody = document.getElementById('corpo-tabella');
+                
+                tbody.innerHTML = ''; // Pulisci tabella
+
+                if(data.error) {
+                    // SE IL DATABASE È STATO CANCELLATO (SQL INJECTION RIUSCITA)
+                    tbody.innerHTML = `<tr><td colspan="2" style="color:red; text-align:center; font-weight:bold;">⚠️ ERRORE CRITICO: ${data.error}</td></tr>`;
+                    return;
+                }
+
+                if(data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="2" style="text-align:center;">Nessun voto presente.</td></tr>`;
+                    return;
+                }
+
+                // Genera righe tabella
+                data.forEach(riga => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `<td>${riga.candidato}</td><td>${riga.conteggio}</td>`;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                document.getElementById('corpo-tabella').innerHTML = `<tr><td colspan="2" style="color:red; text-align:center;">Server Offline o Irraggiungibile</td></tr>`;
+            }
+        }
+
+        // Carica risultati all'avvio
+        vediRisultati();
+    </script>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>Elezioni Scolastiche</h1>
+            <p>Sistema di Voto Digitale Sicuro (?)</p>
+        </div>
+
+        <div class="content">
+        <div class="form-group">
+            <label>I tuoi dati (Anagrafica)</label>
+            <input type="text" id="nome" placeholder="Nome">
+            <input type="text" id="cognome" placeholder="Cognome" style="margin-top:5px">
+            <input type="text" id="classe" placeholder="Classe (es. 4A)" style="margin-top:5px">
+        </div>
+        
+        <div class="form-group">
+            <label for="candidato">Esprimi la tua preferenza</label>
+            <input type="text" id="candidato" placeholder="Nome della lista o del candidato...">
+        </div>           
+
+        <button class="btn-vote" onclick="inviaVoto()">CONFERMA VOTO</button>
+        
+        <div id="status" class="status-msg"></div>
+        </div>
+            <div id="status" class="status-msg"></div>
+
+            <div class="results-area">
+                <h3>📊 Scrutinio in Tempo Reale</h3>
+                <table id="tabella-risultati">
+                    <thead>
+                        <tr>
+                            <th>Candidato / Lista</th>
+                            <th>Voti Totali</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpo-tabella">
+                        <tr><td colspan="2" style="text-align:center; color:#999;">Caricamento dati...</td></tr>
+                    </tbody>
+                </table>
+                <br>
+                <button class="btn-refresh" onclick="vediRisultati()">Aggior
