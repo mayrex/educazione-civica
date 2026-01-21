@@ -13,7 +13,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // 1. INIZIALIZZAZIONE DATABASE CON 3 TABELLE
 db.serialize(() => {
-    // Tabella 1: Anagrafica Studenti (Chi ha diritto al voto)
+    // Tabella 1: Anagrafica Studenti
     db.run(`CREATE TABLE studenti (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT,
@@ -34,43 +34,43 @@ db.serialize(() => {
         candidato TEXT
     )`);
 
-    // INSERIMENTO DATI DI PROVA
-    // Studenti autorizzati
-    // 1. DEFINIZIONE ARRAY DI ALUNNI
+    // --- INSERIMENTO DATI DI PROVA ---
+
+    // 1. Inserimento Studenti
     const alunni = [
         { nome: "Mario", cognome: "Rossi", classe: "5A" },
         { nome: "Luca", cognome: "Bianchi", classe: "5A" },
         { nome: "Sara", cognome: "Verdi", classe: "4B" },
         { nome: "Domenico", cognome: "Russo", classe: "5FS" },
-        { nome: "Chiara", cognome: "Esposito", classe: "3C" }, // Puoi aggiungerne quanti ne vuoi qui
-        { nome: "Chiara", cognome: "Maisto", classe: "5N" } // Puoi aggiungerne quanti ne vuoi qui
+        { nome: "Chiara", cognome: "Esposito", classe: "3C" },
     ];
-
     const inserisciStudente = db.prepare("INSERT INTO studenti (nome, cognome, classe) VALUES (?, ?, ?)");
-
-    alunni.forEach(alunno => {
-        inserisciStudente.run(alunno.nome, alunno.cognome, alunno.classe);
-    });
-
+    alunni.forEach(alunno => inserisciStudente.run(alunno.nome, alunno.cognome, alunno.classe));
     inserisciStudente.finalize();
 
-    // Liste elettorali
+    // 2. Inserimento Liste (solo una volta per nome)
     const inserisciLista = db.prepare("INSERT INTO candidati (nome_lista) VALUES (?)");
     inserisciLista.run("Lista 1 - Innovazione");
     inserisciLista.run("Lista 2 - Studenti Uniti");
-        for(let i = 0; i < 12; i++) {
-        inserisciLista.run("Lista 1 - Innovazione");
-    }
-
-    // Aggiungiamo 8 voti per la Lista 2
-    for(let i = 0; i < 8; i++) {
-        inserisciLista.run("Lista 2 - Studenti Uniti");
-    }
     inserisciLista.finalize();
 
-    console.log("Sistema Pronto: Tabelle create e studenti caricati.");
-});
+    // 3. PRE-CARICAMENTO VOTI NELL'URNA (voti_anonimi)
+    const inserisciVotoInUrna = db.prepare("INSERT INTO voti_anonimi (candidato) VALUES (?)");
 
+    // Aggiungiamo 12 voti pre-esistenti per la Lista 1
+    for(let i = 0; i < 12; i++) {
+        inserisciVotoInUrna.run("Lista 1 - Innovazione");
+    }
+
+    // Aggiungiamo 8 voti pre-esistenti per la Lista 2
+    for(let i = 0; i < 8; i++) {
+        inserisciVotoInUrna.run("Lista 2 - Studenti Uniti");
+    }
+    
+    inserisciVotoInUrna.finalize();
+
+    console.log("Sistema Pronto: Tabelle create, studenti caricati e urna inizializzata con voti demo.");
+});
 // 2. ROTTA DI VOTO (CON LOGICA DI CONTROLLO E VULNERABILITÀ)
 app.post('/vota', (req, res) => {
     const { nome, cognome, classe, candidato } = req.body;

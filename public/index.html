@@ -3,223 +3,228 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elezioni Studentesche - Portale Ufficiale</title>
-    <style>
-        :root {
-            --primary-color: #0056b3;
-            --secondary-color: #f8f9fa;
-            --text-color: #333;
-            --accent-color: #28a745;
-            --danger-color: #dc3545;
-        }
-
-        body {
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: #e9ecef;
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            color: var(--text-color);
-        }
-
-        .container {
-            background: white;
-            width: 90%;
-            max-width: 600px;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-
-        .header {
-            background: linear-gradient(135deg, var(--primary-color), #004494);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-
-        .header h1 { margin: 0; font-size: 1.8rem; }
-        .header p { margin: 10px 0 0; opacity: 0.9; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
-
-        .content { padding: 30px; }
-
-        .form-group { margin-bottom: 20px; }
-        
-        label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; }
-        
-        input[type="text"] {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 6px;
-            font-size: 1rem;
-            box-sizing: border-box; 
-            transition: border-color 0.3s;
-        }
-
-        input[type="text"]:focus {
-            border-color: var(--primary-color);
-            outline: none;
-        }
-
-        button {
-            width: 100%;
-            padding: 14px;
-            border: none;
-            border-radius: 6px;
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .btn-vote { background-color: var(--primary-color); color: white; margin-bottom: 15px; }
-        .btn-vote:hover { background-color: #004494; }
-
-        .btn-refresh { background-color: var(--secondary-color); color: var(--text-color); border: 1px solid #ddd; }
-        .btn-refresh:hover { background-color: #e2e6ea; }
-
-        /* Stile Tabella Risultati */
-        .results-area { margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background-color: #f8f9fa; color: #666; font-size: 0.85rem; text-transform: uppercase; }
-        td:last-child { font-weight: bold; text-align: right; }
-        
-        .status-msg { margin-top: 15px; padding: 10px; border-radius: 6px; font-size: 0.9rem; display: none; text-align: center;}
-        .success { background-color: #d4edda; color: #155724; }
-        .error { background-color: #f8d7da; color: #721c24; }
-        
-        .footer {
-            text-align: center;
-            padding: 15px;
-            background: #f1f1f1;
-            font-size: 0.8rem;
-            color: #888;
-        }
-    </style>
-    <script>
-       
-        function showMessage(msg, type) {
-            const el = document.getElementById('status');
-            el.textContent = msg;
-            el.className = 'status-msg ' + type;
-            el.style.display = 'block';
-            setTimeout(() => { el.style.display = 'none'; }, 3000);
-        }
-
-      async function inviaVoto() {
-        // Raccogliamo i dati dai nuovi ID
-        const nome = document.getElementById('nome').value;
-        const cognome = document.getElementById('cognome').value;
-        const classe = document.getElementById('classe').value;
-        const candidato = document.getElementById('candidato').value;
-        
-        // Validazione base
-        if(!nome || !cognome || !classe || !candidato) {
-            showMessage("Tutti i campi sono obbligatori!", "error");
-            return;
-        }
-
-        try {
-            const res = await fetch('/vota', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ nome, cognome, classe, candidato })
-            });
-            const data = await res.json();
-            
-            if(res.ok) {
-                showMessage("Voto registrato con successo!", "success");
-                // Puliamo i campi dopo il voto
-                document.getElementById('nome').value = '';
-                document.getElementById('cognome').value = '';
-                document.getElementById('candidato').value = '';
-                vediRisultati(); 
-            } else {
-                showMessage("Errore: " + data.error, "error");
-            }
-        } catch (e) {
-            showMessage("Errore di connessione al server", "error");
-        }
-    }
-
-        async function vediRisultati() {
-            try {
-                const res = await fetch('/risultati');
-                const data = await res.json();
-                const tbody = document.getElementById('corpo-tabella');
-                
-                tbody.innerHTML = ''; // Pulisci tabella
-
-                if(data.error) {
-                    // SE IL DATABASE È STATO CANCELLATO (SQL INJECTION RIUSCITA)
-                    tbody.innerHTML = `<tr><td colspan="2" style="color:red; text-align:center; font-weight:bold;">⚠️ ERRORE CRITICO: ${data.error}</td></tr>`;
-                    return;
-                }
-
-                if(data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="2" style="text-align:center;">Nessun voto presente.</td></tr>`;
-                    return;
-                }
-
-                // Genera righe tabella
-                data.forEach(riga => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `<td>${riga.candidato}</td><td>${riga.conteggio}</td>`;
-                    tbody.appendChild(tr);
-                });
-            } catch (e) {
-                document.getElementById('corpo-tabella').innerHTML = `<tr><td colspan="2" style="color:red; text-align:center;">Server Offline o Irraggiungibile</td></tr>`;
-            }
-        }
-
-        // Carica risultati all'avvio
-        vediRisultati();
-    </script>
+    <title>Voto Digitale: Informatica e Democrazia - Liceo Fermi</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Font per un look professionale -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
-    <div class="container">
-        <div class="header">
-            <h1>Elezioni Scolastiche</h1>
-            <p>Sistema di Voto Digitale Sicuro (?)</p>
+    <!-- Navigazione -->
+    <nav>
+        <div class="nav-content">
+            <div class="logo">
+    <!-- Sostituisci 'logo-fermi.png' con il percorso del tuo file immagine -->
+                <img src="images/LogoFermiCompleto-removebg-preview.png" alt="Logo Liceo Fermi" class="navbar-logo">
+            </div>
+            <ul>
+                <li><a href="#home">Home</a></li>
+                <li><a href="#confronto">Evoluzione</a></li>
+                <li><a href="#costituzione">Diritti</a></li>
+                <li><a href="#sicurezza">Sicurezza</a></li>
+                <li><a href="#tecnica">Privacy</a></li>
+                <li><a href="#demo">Demo</a></li>
+            </ul>
         </div>
+    </nav>
 
-        <div class="content">
-        <div class="form-group">
-            <label>I tuoi dati (Anagrafica)</label>
-            <input type="text" id="nome" placeholder="Nome">
-            <input type="text" id="cognome" placeholder="Cognome" style="margin-top:5px">
-            <input type="text" id="classe" placeholder="Classe (es. 4A)" style="margin-top:5px">
+    <!-- Sezione 1: HERO -->
+    <section id="home" class="hero-section">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+            <div class="authors">A cura di: V. Turco, D. Russo, D. D’Alessandro, A. Fedele, S. Ruffo, M. Rizzuto, S. Pisapia</div>
+            <h1>VOTO DIGITALE:<br><span>Informatica e Democrazia</span></h1>
+            <p>La tecnologia al servizio della partecipazione cittadina: dall'aula scolastica alla Costituzione.</p>
+            <a href="#intro" class="btn-tour">INIZIA IL TOUR <span>↓</span></a>
         </div>
-        
-        <div class="form-group">
-            <label for="candidato">Esprimi la tua preferenza</label>
-            <input type="text" id="candidato" placeholder="Nome della lista o del candidato...">
-        </div>           
+    </section>
 
-        <button class="btn-vote" onclick="inviaVoto()">CONFERMA VOTO</button>
-        
-        <div id="status" class="status-msg"></div>
+    <!-- Sezione 2: INTRODUZIONE -->
+    <section id="intro" class="content-section bg-light">
+        <div class="container">
+            <div class="split-view">
+                <div class="text-block">
+                    <span class="tag">Introduzione</span>
+                    <h2>La tecnologia al servizio della democrazia</h2>
+                    <p>L’educazione civica studia come i cittadini partecipano alla vita democratica. In questo contesto, il voto rappresenta lo strumento principale di partecipazione. Abbiamo sperimentato come l'informatica possa rendere questo processo più vicino alle competenze digitali richieste oggi.</p>
+                </div>
+                <div class="info-box-grid">
+                    <div class="info-card-small">
+                        <strong>Trasparenza</strong>
+                        <p>Processi chiari e verificabili.</p>
+                    </div>
+                    <div class="info-card-small">
+                        <strong>Efficienza</strong>
+                        <p>Risultati immediati e precisi.</p>
+                    </div>
+                </div>
+            </div>
         </div>
-            <div id="status" class="status-msg"></div>
+    </section>
 
-            <div class="results-area">
-                <h3>📊 Scrutinio in Tempo Reale</h3>
-                <table id="tabella-risultati">
-                    <thead>
-                        <tr>
-                            <th>Candidato / Lista</th>
-                            <th>Voti Totali</th>
-                        </tr>
-                    </thead>
-                    <tbody id="corpo-tabella">
-                        <tr><td colspan="2" style="text-align:center; color:#999;">Caricamento dati...</td></tr>
-                    </tbody>
-                </table>
-                <br>
-                <button class="btn-refresh" onclick="vediRisultati()">Aggior
+    <!-- Sezione 3: CONFRONTO -->
+    <section id="confronto" class="content-section bg-dark">
+        <div class="container">
+            <h2 class="center">La Trasformazione del Voto</h2>
+            <div class="comparison-grid">
+                <div class="comp-card trad">
+                    <h3>Voto Tradizionale</h3>
+                    <ul>
+                        <li>📄 Scheda cartacea</li>
+                        <li>🗳️ Urna fisica</li>
+                        <li>⏳ Scrutinio manuale (lento)</li>
+                    </ul>
+                </div>
+                <div class="vs-circle">VS</div>
+                <div class="comp-card digi">
+                    <h3>Voto Digitale</h3>
+                    <ul>
+                        <li>🔗 Accesso tramite link</li>
+                        <li>🆔 Identificazione digitale</li>
+                        <li>⚡ Registrazione e conteggio istantaneo</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sezione 4: ARTICOLO 48 -->
+    <section id="costituzione" class="content-section bg-light">
+        <div class="container">
+            <div class="header-center">
+                <span class="tag">La Legge</span>
+                <h2>Articolo 48 applicato al digitale</h2>
+                <p>La Costituzione stabilisce i pilastri del voto, che la tecnologia deve proteggere:</p>
+            </div>
+            <div class="features-grid">
+                <div class="f-item"><strong>Personale</strong><span>Una persona, un voto</span></div>
+                <div class="f-item"><strong>Eguale</strong><span>Tutti contano allo stesso modo</span></div>
+                <div class="f-item"><strong>Libero</strong><span>Voto espresso senza pressioni</span></div>
+                <div class="f-item"><strong>Segreto</strong><span>Nessuno deve sapere cosa voti</span></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sezione 5: CYBERSECURITY -->
+    <section id="sicurezza" class="content-section bg-accent">
+        <div class="container">
+            <div class="critical-grid">
+                <div class="critical-text">
+                    <h2>Un Sistema Critico</h2>
+                    <p>Un sistema di voto digitale è un'infrastruttura sensibile. Deve essere protetto da errori, accessi non autorizzati e attacchi informatici.</p>
+                    <div class="warning-box">
+                        <strong>Senza sicurezza:</strong>
+                        <p>Il voto non è più segreto e i risultati possono essere falsati.</p>
+                    </div>
+                </div>
+                <div class="triad-display">
+                    <div class="triad-box">
+                        <h4>Confidenzialità</h4>
+                        <p>Solo il votante conosce la scelta. Dati cifrati.</p>
+                    </div>
+                    <div class="triad-box">
+                        <h4>Integrità</h4>
+                        <p>Il voto non può essere modificato o cancellato.</p>
+                    </div>
+                    <div class="triad-box">
+                        <h4>Disponibilità</h4>
+                        <p>Il sistema deve funzionare per tutti, senza esclusioni tecniche.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Sezione 6: DATABASE & PRIVACY -->
+    <section id="tecnica" class="content-section bg-light">
+        <div class="container">
+            <div class="db-section">
+                <div class="db-text">
+                    <h2>Il Cuore del Sistema: Il Database</h2>
+                    <p>Per garantire la segretezza, è fondamentale <strong>separare i dati dell'utente dai dati del voto</strong>. Il database memorizza i voti impedendo duplicati o modifiche.</p>
+                </div>
+                <div class="privacy-rules">
+                    <div class="rule">
+                        <span>01</span>
+                        <p>L'utente viene riconosciuto per poter votare (Identità).</p>
+                    </div>
+                    <div class="rule">
+                        <span>02</span>
+                        <p>Dopo il voto, il sistema scollega la persona dalla scelta (Anonimato).</p>
+                    </div>
+                    <div class="rule">
+                        <span>03</span>
+                        <p>Controlli informatici evitano voti multipli.</p>
+                    </div>
+                </div>
+            </div>
+            <p class="final-quote">"La tecnologia bilancia controllo e libertà."</p>
+        </div>
+    </section>
+
+    <!-- SEZIONE DEMO (Invariata come richiesto) -->
+    <section id="demo" class="demo-section">
+        <div class="container">
+            <div class="demo-card">
+                <div class="header">
+                    <!-- AGGIUNTA DENTRO LA CARD (Sotto il div "header") -->
+                <div class="content">
+                    <button class="btn-video" onclick="toggleVideo()">🎥 GUARDA VIDEO DIMOSTRATIVO</button>
+                        <div class="modal-content">
+        <span class="close-modal" onclick="toggleVideo()">&times;</span>
+        <div class="video-wrapper">
+            <!-- Sostituisci l'URL con il link al tuo video (YouTube, Drive o file locale) -->
+            <iframe id="videoPlayer" src="video/ed civica.mp4" frameborder="0" allowfullscreen></iframe>
+        </div>
+    </div>
+</div>
+                </div>
+                    <h1>Elezioni Scolastiche</h1>
+                    <p>Sistema di Voto Digitale Sicuro (?)</p>
+                </div>
+
+                <div class="content">
+                    <div class="form-group">
+                        <label>I tuoi dati (Anagrafica)</label>
+                        <input type="text" id="nome" placeholder="Nome">
+                        <input type="text" id="cognome" placeholder="Cognome" style="margin-top:5px">
+                        <input type="text" id="classe" placeholder="Classe (es. 4A)" style="margin-top:5px">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="candidato">Esprimi la tua preferenza</label>
+                        <input type="text" id="candidato" placeholder="Nome della lista o del candidato...">
+                    </div>           
+
+                    <button class="btn-vote" onclick="inviaVoto()">CONFERMA VOTO</button>
+                    
+                    <div id="status" class="status-msg"></div>
+
+                    <div class="results-area">
+                        <h3>📊 Scrutinio in Tempo Reale</h3>
+                        <table id="tabella-risultati">
+                            <thead>
+                                <tr>
+                                    <th>Candidato / Lista</th>
+                                    <th>Voti Totali</th>
+                                </tr>
+                            </thead>
+                            <tbody id="corpo-tabella">
+                                <tr><td colspan="2" style="text-align:center; color:#999;">Caricamento dati...</td></tr>
+                            </tbody>
+                        </table>
+                        <br>
+                        <button class="btn-refresh" onclick="vediRisultati()">Aggiorna Dati</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <p>&copy; 2024 Liceo Scientifico "Enrico Fermi" Aversa - Progetto Educazione Civica e Informatica</p>
+    </footer>
+    
+    <script src="script.js"></script>
+</body>
+</html>
